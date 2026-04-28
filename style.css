@@ -1,0 +1,44 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    background-color: #f4f4f9;
+}
+
+.container {
+    display: flex;
+    gap: 30px;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+canvas {
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 250px;
+}
+
+.control-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+input[type="range"] {
+    width: 100%;
+}
