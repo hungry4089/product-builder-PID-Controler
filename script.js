@@ -6,6 +6,25 @@ const targetSlider = document.getElementById('target');
 const kpSlider = document.getElementById('kp');
 const kiSlider = document.getElementById('ki');
 const kdSlider = document.getElementById('kd');
+const modeToggle = document.getElementById('modeToggle');
+
+// 테마 관리
+const currentTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', currentTheme);
+updateToggleText(currentTheme);
+
+modeToggle.addEventListener('click', () => {
+    let theme = document.documentElement.getAttribute('data-theme');
+    let newTheme = theme === 'light' ? 'dark' : 'light';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateToggleText(newTheme);
+});
+
+function updateToggleText(theme) {
+    modeToggle.innerText = theme === 'light' ? '다크 모드' : '화이트 모드';
+}
 
 // 물리 모델 변수 (진자 운동)
 let angle = Math.PI / 2; // 현재 각도 (라디안)
@@ -73,6 +92,8 @@ function update() {
 
 // 캔버스 렌더링 함수
 function draw(targetAngle) {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
@@ -81,32 +102,34 @@ function draw(targetAngle) {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.sin(targetAngle) * length, cy + Math.cos(targetAngle) * length);
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+    ctx.strokeStyle = isDark ? 'rgba(255, 100, 100, 0.5)' : 'rgba(255, 0, 0, 0.3)';
     ctx.setLineDash([5, 5]);
     ctx.stroke();
     ctx.setLineDash([]); // 점선 초기화
 
-    // 편심봉 막대기 그리기 (검은색 선)
+    // 편심봉 막대기 그리기
     const px = cx + Math.sin(angle) * length;
     const py = cy + Math.cos(angle) * length;
     
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(px, py);
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = isDark ? '#eee' : '#333';
     ctx.lineWidth = 5;
     ctx.stroke();
 
     // 모터 축(중심점) 그리기
     ctx.beginPath();
     ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = isDark ? '#888' : '#666';
     ctx.fill();
 
     // 편심봉 끝 질량(추) 그리기
     ctx.beginPath();
     ctx.arc(px, py, 15, 0, Math.PI * 2);
     ctx.fillStyle = '#3498db';
+    ctx.strokeStyle = isDark ? '#fff' : '#000';
+    ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
 }
