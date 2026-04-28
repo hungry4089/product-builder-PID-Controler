@@ -10,7 +10,6 @@ const elements = {
     manualVolt: document.getElementById('manualVolt'),
     resetBtn: document.getElementById('resetSim'),
     pauseBtn: document.getElementById('pauseSim'),
-    overlay: document.getElementById('canvasAngleOverlay'),
     statAngle: document.getElementById('statAngle'),
     statVel: document.getElementById('statVel'),
     statVolt: document.getElementById('statVolt'),
@@ -202,7 +201,6 @@ function update() {
         elements.statAngle.innerText = currentDeg;
         elements.statVel.innerText = (angularVelocity * (180/Math.PI)).toFixed(1);
         elements.statVolt.innerText = motorTorque.toFixed(2);
-        elements.overlay.innerText = currentDeg + "°";
 
         graphData.angle.push(parseFloat(currentDeg));
         graphData.target.push(targetDeg);
