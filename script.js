@@ -7,6 +7,7 @@ const kpSlider = document.getElementById('kp');
 const kiSlider = document.getElementById('ki');
 const kdSlider = document.getElementById('kd');
 const modeToggle = document.getElementById('modeToggle');
+const resetBtn = document.getElementById('resetSim');
 
 // 테마 관리
 const currentTheme = localStorage.getItem('theme') || 'light';
@@ -16,7 +17,6 @@ updateToggleText(currentTheme);
 modeToggle.addEventListener('click', () => {
     let theme = document.documentElement.getAttribute('data-theme');
     let newTheme = theme === 'light' ? 'dark' : 'light';
-    
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     updateToggleText(newTheme);
@@ -26,115 +26,114 @@ function updateToggleText(theme) {
     modeToggle.innerText = theme === 'light' ? '다크 모드' : '화이트 모드';
 }
 
-// 물리 모델 변수 (진자 운동)
-let angle = Math.PI / 2; // 현재 각도 (라디안)
+// 물리 모델 변수
+let angle = 0;           // 현재 각도 (0은 아래 방향)
 let angularVelocity = 0; // 각속도
-const mass = 1.0;        // 질량
-const length = 120;      // 편심봉 길이
-const gravity = 9.81;    // 중력 가속도
-const damping = 0.95;    // 마찰(감쇠) 계수
+const length = 140;      // 막대 길이
+const gravity = 0.5;     // 중력 세기 (조절됨)
+const damping = 0.98;    // 공기 저항/마찰
 
 // PID 제어 변수
 let integral = 0;
 let prevError = 0;
 
-// 메인 루프 (초당 약 60프레임 실행)
+// 초기화 함수
+function resetSimulation() {
+    angle = 0;
+    angularVelocity = 0;
+    integral = 0;
+    prevError = 0;
+}
+
+resetBtn.addEventListener('click', resetSimulation);
+
+// 메인 루프
 function update() {
-    // 1. 현재 UI 설정값 읽기
+    // 1. UI 값 읽기
     const targetAngleDegree = parseFloat(targetSlider.value);
-    const targetAngle = targetAngleDegree * (Math.PI / 180); // 도(Degree) -> 라디안(Radian) 변환
+    const targetAngle = targetAngleDegree * (Math.PI / 180);
     const kp = parseFloat(kpSlider.value);
     const ki = parseFloat(kiSlider.value);
     const kd = parseFloat(kdSlider.value);
 
-    // 2. PID 오차 계산 (최단 거리 정규화 적용)
-    let rawError = targetAngle - angle;
-    
-    // 무한 회전 방지: 오차를 항상 -180도 ~ 180도(-π ~ π) 사이로 제한
-    let error = Math.atan2(Math.sin(rawError), Math.cos(rawError)); 
+    // 2. PID 계산
+    // 목표 각도와 현재 각도 사이의 오차 (최단 거리 계산)
+    let error = targetAngle - angle;
+    // -PI ~ PI 사이로 정규화하여 최단 경로로 회전하게 함
+    while (error > Math.PI) error -= Math.PI * 2;
+    while (error < -Math.PI) error += Math.PI * 2;
 
     integral += error;
-
-    // 적분 폭주(Windup) 방지 안전장치
-    if (integral > 100) integral = 100;
-    if (integral < -100) integral = -100;
-
-    // 연산 오류(NaN) 발생 시 초기화 안전장치
-    if (isNaN(angle) || isNaN(integral) || isNaN(angularVelocity)) {
-        angle = Math.PI / 2;
-        angularVelocity = 0;
-        integral = 0;
-        error = 0;
-    }
+    // 적분 윈드업 방지
+    integral = Math.max(Math.min(integral, 10), -10);
 
     const derivative = error - prevError;
-    
-    // 3. PID 출력 (모터 제어량) 계산
-    const controlSignal = (kp * error) + (ki * integral) + (kd * derivative);
     prevError = error;
 
-    // 4. 물리 엔진 계산 (외력 및 가속도)
-    // 중력에 의한 토크 (수직일 때 최대치, 수평일 때 0에 수렴)
-    const gravityTorque = mass * gravity * length * Math.sin(angle) * 0.005; 
+    // 제어 신호 (토크)
+    const controlSignal = (kp * 0.01 * error) + (ki * 0.001 * integral) + (kd * 0.1 * derivative);
+
+    // 3. 물리 계산
+    // 중력에 의한 토크: sin(angle)을 사용하여 아래쪽(0)이 가장 안정적이게 설정
+    const gravityTorque = gravity * Math.sin(angle);
     
-    // 최종 각가속도 = (모터 출력 - 중력 토크) 적용
+    // 각가속도 = 제어 토크 - 중력 토크
     const angularAcceleration = controlSignal - gravityTorque;
 
-    // 속도 및 위치 적분 계산
     angularVelocity += angularAcceleration;
-    angularVelocity *= damping; // 마찰 적용
+    angularVelocity *= damping;
     angle += angularVelocity;
 
-    // 화면 갱신
     draw(targetAngle);
     requestAnimationFrame(update);
 }
 
-// 캔버스 렌더링 함수
 function draw(targetAngle) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
 
-    // 목표 위치 가이드라인 그리기 (붉은색 점선)
+    // 목표 기준선 (가이드)
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.sin(targetAngle) * length, cy + Math.cos(targetAngle) * length);
-    ctx.strokeStyle = isDark ? 'rgba(255, 100, 100, 0.5)' : 'rgba(255, 0, 0, 0.3)';
+    ctx.strokeStyle = isDark ? 'rgba(255, 100, 100, 0.6)' : 'rgba(255, 0, 0, 0.4)';
     ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.setLineDash([]); // 점선 초기화
+    ctx.setLineDash([]);
 
-    // 편심봉 막대기 그리기
+    // 기어봉 (회전 막대)
     const px = cx + Math.sin(angle) * length;
     const py = cy + Math.cos(angle) * length;
     
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#eee' : '#333';
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = isDark ? '#ffffff' : '#2c3e50';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
     ctx.stroke();
 
-    // 모터 축(중심점) 그리기
+    // 중심축
     ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    ctx.fillStyle = isDark ? '#888' : '#666';
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.fillStyle = isDark ? '#ecf0f1' : '#34495e';
     ctx.fill();
 
-    // 편심봉 끝 질량(추) 그리기
+    // 끝부분 추
     ctx.beginPath();
-    ctx.arc(px, py, 15, 0, Math.PI * 2);
+    ctx.arc(px, py, 18, 0, Math.PI * 2);
     ctx.fillStyle = '#3498db';
-    ctx.strokeStyle = isDark ? '#fff' : '#000';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isDark ? '#fff' : '#2980b9';
+    ctx.lineWidth = 3;
     ctx.fill();
     ctx.stroke();
 }
 
-// 슬라이더 조작 시 텍스트 즉시 변경 이벤트 리스너
+// 슬라이더 이벤트
 const inputs = ['target', 'kp', 'ki', 'kd'];
 inputs.forEach(id => {
     document.getElementById(id).addEventListener('input', (e) => {
@@ -142,5 +141,4 @@ inputs.forEach(id => {
     });
 });
 
-// 시뮬레이션 시작
 update();
