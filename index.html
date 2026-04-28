@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PID Controller Study — 모터 펜싱봉 시뮬레이션</title>
+    <title>PID Controller — 모터 편심봉 시뮬레이션</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header>
-        <h1>PID Controller Study — 모터 펜싱봉 시뮬레이션</h1>
+        <h1>PID Controller Study — 모터 편심봉 시뮬레이션</h1>
         <div class="theme-toggle">
             <button id="modeToggle">다크 모드</button>
         </div>
     </header>
 
-    <main class="dashboard">
+    <main class="dashboard" data-mode="manual">
         <div class="top-row">
             <!-- 시뮬레이션 영역 -->
             <section class="card sim-section">
                 <div class="card-header">모터/진자 시뮬레이션</div>
                 <div class="canvas-container" id="canvasContainer">
-                    <canvas id="simCanvas" width="400" height="360"></canvas>
+                    <canvas id="simCanvas" width="400" height="240"></canvas>
                     <div id="canvasAngleOverlay">0.0°</div>
                 </div>
                 <div class="status-bar">

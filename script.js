@@ -1,5 +1,6 @@
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
+const dashboard = document.querySelector('.dashboard');
 
 const elements = {
     target: document.getElementById('target'),
@@ -24,17 +25,17 @@ const elements = {
 // --- 고정밀 물리 모델 상수 ---
 let isPaused = false;
 let currentMode = 'manual';
-let angle = 0;           // 현재 각도 (라디안, -PI ~ PI 유지)
-let angularVelocity = 0; // 각속도 (rad/s)
-let integral = 0;        // 누적 오차
-let prevError = 0;       // 이전 오차
+let angle = 0;           
+let angularVelocity = 0; 
+let integral = 0;        
+let prevError = 0;       
 
-const M = 5.0;           // 5kg
-const L = 0.25;          // 25cm
+const M = 5.0;           
+const L = 0.25;          
 const G = 9.81;          
-const I = M * L * L;     // 관성 모멘트
-const B = 0.4;           // 감쇠 계수: 낮게 설정하여 출렁거림 유도
-const KT = 1.7;          // 토크 상수: 8V 인가 시 중력 극복 (8 * 1.7 > 5 * 9.8 * 0.25)
+const I = M * L * L;     
+const B = 0.4;           
+const KT = 1.7;          
 const DT = 1 / 60;       
 
 // --- 그래프 데이터 ---
@@ -48,18 +49,17 @@ const graphData = {
     p: Array(MAX_POINTS).fill(0), i: Array(MAX_POINTS).fill(0), d: Array(MAX_POINTS).fill(0)
 };
 
-// Chart.js 커스텀 플러그인: 현재 값을 그래프에 표시
 const valueLabelPlugin = {
     id: 'valueLabel',
     afterDatasetsDraw(chart) {
         const {ctx, data, chartArea: {top, right}} = chart;
         ctx.save();
         ctx.fillStyle = chart.options.plugins.valueLabel.color || '#007bff';
-        ctx.font = 'bold 12px Arial';
+        ctx.font = 'bold 11px Arial';
         ctx.textAlign = 'right';
         const lastValue = data.datasets[0].data[data.datasets[0].data.length - 1];
         if (typeof lastValue === 'number') {
-            ctx.fillText(lastValue.toFixed(1) + (chart.options.plugins.valueLabel.unit || ''), right - 5, top + 15);
+            ctx.fillText(lastValue.toFixed(1) + (chart.options.plugins.valueLabel.unit || ''), right - 5, top + 12);
         }
         ctx.restore();
     }
@@ -70,10 +70,10 @@ const getChartOptions = (yMin, yMax, unit = '', color = '#007bff') => ({
     responsive: true, maintainAspectRatio: false, animation: false,
     scales: { 
         x: { display: false }, 
-        y: { min: yMin, max: yMax, grid: { color: 'rgba(128,128,128,0.1)' } } 
+        y: { min: yMin, max: yMax, grid: { color: 'rgba(128,128,128,0.06)' }, ticks: { font: { size: 9 } } } 
     },
     plugins: { 
-        legend: { labels: { boxWidth: 10, font: { size: 9 } } },
+        legend: { labels: { boxWidth: 8, font: { size: 9 } } },
         valueLabel: { unit: unit, color: color }
     }
 });
@@ -84,18 +84,18 @@ const charts = {
         data: { 
             labels: graphData.labels, 
             datasets: [
-                { label: '현재 각도', data: graphData.angle, borderColor: '#007bff', borderWidth: 1.5, pointRadius: 0 },
+                { label: '각도', data: graphData.angle, borderColor: '#007bff', borderWidth: 1.5, pointRadius: 0 },
                 { label: '목표', data: graphData.target, borderColor: '#28a745', borderWidth: 1, borderDash: [3, 3], pointRadius: 0 }
             ] 
         },
         options: getChartOptions(-180, 180, '°', '#007bff')
     }),
     error: new Chart(document.getElementById('chartError'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '오차 (Error)', data: graphData.error, borderColor: '#dc3545', borderWidth: 1.5, pointRadius: 0 }] },
+        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '오차', data: graphData.error, borderColor: '#dc3545', borderWidth: 1.5, pointRadius: 0 }] },
         options: getChartOptions(-180, 180, '°', '#dc3545')
     }),
     volt: new Chart(document.getElementById('chartVolt'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '인가 토크 (Nm)', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.5, pointRadius: 0 }] },
+        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '토크(Nm)', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.5, pointRadius: 0 }] },
         options: getChartOptions(-20, 20, ' Nm', '#28a745')
     }),
     pid: new Chart(document.getElementById('chartPID'), {
@@ -136,18 +136,16 @@ function update() {
         let motorTorque = 0;
         let p_out = 0, i_out = 0, d_out = 0;
 
-        // 현재 각도 정규화 (-PI ~ PI)
         while (angle > Math.PI) angle -= Math.PI * 2;
         while (angle < -Math.PI) angle += Math.PI * 2;
 
         if (currentMode === 'pid') {
             let error = targetRad - angle;
-            // 최단 경로 오차 계산
             while (error > Math.PI) error -= Math.PI * 2;
             while (error < -Math.PI) error += Math.PI * 2;
 
             integral += error * DT;
-            integral = Math.max(Math.min(integral, 10), -10); // Anti-windup
+            integral = Math.max(Math.min(integral, 10), -10); 
             const derivative = (error - prevError) / DT;
 
             p_out = (kp * 0.4) * error;
@@ -162,10 +160,9 @@ function update() {
         } else {
             motorTorque = parseFloat(elements.manualVolt.value) * KT;
             graphData.error.push(0); graphData.p.push(0); graphData.i.push(0); graphData.d.push(0);
-            integral = 0; // 수동 모드 시 누적 오차 초기화
+            integral = 0;
         }
 
-        // 물리 연산
         const gravityTorque = M * G * L * Math.sin(angle);
         const frictionTorque = B * angularVelocity;
         const netTorque = motorTorque - gravityTorque - frictionTorque;
@@ -180,7 +177,6 @@ function update() {
         elements.statVolt.innerText = motorTorque.toFixed(2);
         elements.overlay.innerText = currentDeg + "°";
 
-        // 그래프 갱신
         graphData.angle.push(parseFloat(currentDeg));
         graphData.target.push(targetDeg);
         graphData.voltage.push(motorTorque);
@@ -199,52 +195,102 @@ function draw(targetRad) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const cx = canvas.width / 2;
-    const cy = canvas.height / 2 - 20;
-    const drawL = 110;
+    const cy = canvas.height / 2 - 10;
+    const drawL = 75;
 
-    // 가이드 원
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-    ctx.beginPath(); ctx.arc(cx, cy, drawL, 0, Math.PI * 2); ctx.stroke();
+    // 1. 눈금판 배경 (Degree Scale)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
+    ctx.font = '9px Arial';
+    ctx.textAlign = 'center';
 
-    if (currentMode === 'pid') {
+    for (let i = 0; i < 360; i += 30) {
+        const rad = (i - 90) * (Math.PI / 180);
+        const x1 = Math.cos(rad) * (drawL + 5);
+        const y1 = Math.sin(rad) * (drawL + 5);
+        const x2 = Math.cos(rad) * (drawL + 15);
+        const y2 = Math.sin(rad) * (drawL + 15);
+        
         ctx.beginPath();
-        ctx.setLineDash([6, 4]);
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.sin(targetRad) * drawL, cy + Math.cos(targetRad) * drawL);
-        ctx.strokeStyle = '#28a745';
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
-        ctx.setLineDash([]);
+
+        // 숫자 표시 (0, 90, 180, -90 등)
+        const label = i <= 180 ? i : i - 360;
+        const tx = Math.cos(rad) * (drawL + 25);
+        const ty = Math.sin(rad) * (drawL + 25) + 3;
+        ctx.fillText(label + '°', tx, ty);
+    }
+    ctx.restore();
+
+    // 2. 현재 모드 표시 배지
+    ctx.save();
+    const modeText = currentMode === 'manual' ? 'MANUAL MODE' : 'PID CONTROL';
+    const modeColor = currentMode === 'manual' ? '#fd7e14' : '#28a745';
+    ctx.fillStyle = modeColor;
+    ctx.font = 'bold 10px Arial';
+    ctx.fillRect(10, 10, 80, 18);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText(modeText, 50, 23);
+    ctx.restore();
+
+    // 3. 중력 가이드
+    ctx.save();
+    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy + drawL + 20);
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. 목표 위치 (PID 전용)
+    if (currentMode === 'pid') {
+        ctx.beginPath(); ctx.setLineDash([4, 3]);
+        ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(targetRad) * drawL, cy + Math.cos(targetRad) * drawL);
+        ctx.strokeStyle = '#28a745'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
     }
 
-    // 막대기
+    // 5. 모터 본체 (Housing)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 20);
+    grad.addColorStop(0, isDark ? '#555' : '#ddd');
+    grad.addColorStop(1, isDark ? '#333' : '#bbb');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = isDark ? '#444' : '#aaa';
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. 막대기
     const px = cx + Math.sin(angle) * drawL;
     const py = cy + Math.cos(angle) * drawL;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy); ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50';
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
+    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
 
-    // 모터 축
-    ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-    ctx.fillStyle = isDark ? '#444' : '#bdc3c7';
-    ctx.fill(); ctx.stroke();
+    // 7. 모터 샤프트 (Center Shaft)
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = isDark ? '#888' : '#666'; ctx.fill();
 
-    // 추
-    ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI * 2);
-    ctx.fillStyle = '#dc3545';
-    ctx.fill(); ctx.strokeStyle = isDark ? '#fff' : '#000';
+    // 8. 추
+    ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#dc3545'; ctx.fill(); ctx.strokeStyle = isDark ? '#fff' : '#000';
     ctx.lineWidth = 2; ctx.stroke();
 }
 
-// 이벤트 및 초기화
+// 이벤트
 elements.resetBtn.addEventListener('click', () => {
     ['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => document.getElementById(id).value = 0);
     syncSliderTexts();
     angle = 0; angularVelocity = 0; integral = 0; prevError = 0;
 });
-
 elements.pauseBtn.addEventListener('click', () => {
     isPaused = !isPaused;
     elements.pauseBtn.innerText = isPaused ? '재개' : '일시정지';
@@ -257,6 +303,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.add('active');
         currentMode = btn.getAttribute('data-tab');
         document.getElementById(currentMode + '-controls').classList.add('active');
+        // 대시보드 데이터 속성 업데이트
+        dashboard.setAttribute('data-mode', currentMode);
     });
 });
 
