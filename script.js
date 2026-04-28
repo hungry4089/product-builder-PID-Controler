@@ -196,7 +196,7 @@ function draw(targetRad) {
     
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 - 10;
-    const drawL = 75;
+    const drawL = 100; // 길이 증가 (75 -> 100)
 
     // 1. 눈금판 배경 (Degree Scale)
     ctx.save();
@@ -218,7 +218,6 @@ function draw(targetRad) {
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
-        // 숫자 표시 (0, 90, 180, -90 등)
         const label = i <= 180 ? i : i - 360;
         const tx = Math.cos(rad) * (drawL + 25);
         const ty = Math.sin(rad) * (drawL + 25) + 3;
@@ -232,10 +231,10 @@ function draw(targetRad) {
     const modeColor = currentMode === 'manual' ? '#fd7e14' : '#28a745';
     ctx.fillStyle = modeColor;
     ctx.font = 'bold 10px Arial';
-    ctx.fillRect(10, 10, 80, 18);
+    ctx.fillRect(10, 10, 85, 18);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.fillText(modeText, 50, 23);
+    ctx.fillText(modeText, 52.5, 23);
     ctx.restore();
 
     // 3. 중력 가이드
@@ -269,13 +268,16 @@ function draw(targetRad) {
     ctx.stroke();
     ctx.restore();
 
-    // 6. 막대기
+    // 6. 막대기 (Thinner rod)
     const px = cx + Math.sin(angle) * drawL;
     const py = cy + Math.cos(angle) * drawL;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; 
+    ctx.lineWidth = 3; // 두께 대폭 축소 (5 -> 3)
+    ctx.lineCap = 'round';
+    ctx.stroke();
 
-    // 7. 모터 샤프트 (Center Shaft)
+    // 7. 모터 샤프트
     ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
     ctx.fillStyle = isDark ? '#888' : '#666'; ctx.fill();
 
@@ -303,7 +305,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.add('active');
         currentMode = btn.getAttribute('data-tab');
         document.getElementById(currentMode + '-controls').classList.add('active');
-        // 대시보드 데이터 속성 업데이트
         dashboard.setAttribute('data-mode', currentMode);
     });
 });
