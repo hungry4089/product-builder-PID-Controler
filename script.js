@@ -31,11 +31,9 @@ let prevError = 0;
 
 // 물리 상수 및 제약 조건
 const length = 130;
-const gravity = 0.6;
-const damping = 0.97;
+const gravity = 0.5;
+const damping = 0.98;
 const MAX_VOLTAGE = 12;
-// RPM 제한: 2초에 1회전 (360도/2초 = 180도/초 = PI rad/초)
-// 60FPS 기준: PI / 60 rad/frame
 const MAX_ANGULAR_VELOCITY = Math.PI / 40; 
 
 // 그래프 데이터
@@ -51,31 +49,41 @@ const graphData = {
     d: Array(MAX_POINTS).fill(0)
 };
 
-// Chart.js 공통 옵션
-const chartOptions = {
+// Chart.js 옵션 (Y축 범위 안정화 추가)
+const getChartOptions = (yMin, yMax, suggestRange = true) => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
     elements: { line: { tension: 0.1 } },
-    scales: { x: { display: false }, y: { grid: { color: 'rgba(128,128,128,0.1)' } } },
+    scales: { 
+        x: { display: false }, 
+        y: { 
+            // 값이 매우 작을 때 출렁거림 방지: 최소 +/- 1.0 범위 유지
+            min: suggestRange ? undefined : yMin,
+            max: suggestRange ? undefined : yMax,
+            suggestedMin: suggestRange ? -1.0 : yMin,
+            suggestedMax: suggestRange ? 1.0 : yMax,
+            grid: { color: 'rgba(128,128,128,0.1)' } 
+        } 
+    },
     plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } }
-};
+});
 
 const charts = {
     angle: new Chart(document.getElementById('chartAngle'), {
         type: 'line',
-        data: { labels: graphData.labels, datasets: [{ label: '현재 각도', data: graphData.angle, borderColor: '#007bff', borderWidth: 2, pointRadius: 0 }] },
-        options: chartOptions
+        data: { labels: graphData.labels, datasets: [{ label: '각도 (Target vs Current)', data: graphData.angle, borderColor: '#007bff', borderWidth: 2, pointRadius: 0 }] },
+        options: getChartOptions(-180, 180, false)
     }),
     error: new Chart(document.getElementById('chartError'), {
         type: 'line',
         data: { labels: graphData.labels, datasets: [{ label: '오차 (Error)', data: graphData.error, borderColor: '#dc3545', borderWidth: 2, pointRadius: 0 }] },
-        options: chartOptions
+        options: getChartOptions(-180, 180, false)
     }),
     volt: new Chart(document.getElementById('chartVolt'), {
         type: 'line',
         data: { labels: graphData.labels, datasets: [{ label: '제어 전압 (V)', data: graphData.voltage, borderColor: '#28a745', borderWidth: 2, pointRadius: 0 }] },
-        options: chartOptions
+        options: getChartOptions(-12, 12, false)
     }),
     pid: new Chart(document.getElementById('chartPID'), {
         type: 'line',
@@ -87,23 +95,28 @@ const charts = {
                 { label: 'D', data: graphData.d, borderColor: '#9966ff', borderWidth: 1, pointRadius: 0 }
             ] 
         },
-        options: chartOptions
+        options: getChartOptions(-5, 5, true) // PID 성분은 동적 범위 사용하되 최소 +/- 5 유지
     })
 };
 
-// 프리셋 설정 함수
+// 프리셋 설정
 window.setPreset = (type) => {
     switch(type) {
         case 'P': elements.kp.value = 40; elements.ki.value = 0; elements.kd.value = 0; break;
         case 'PD': elements.kp.value = 40; elements.ki.value = 0; elements.kd.value = 5; break;
-        case 'PID': elements.kp.value = 40; elements.ki.value = 1.5; elements.kd.value = 3; break;
-        case 'AGGRESSIVE': elements.kp.value = 80; elements.ki.value = 3; elements.kd.value = 1; break;
+        case 'PID': elements.kp.value = 40; elements.ki.value = 2; elements.kd.value = 4; break;
+        case 'AGGRESSIVE': elements.kp.value = 80; elements.ki.value = 4; elements.kd.value = 2; break;
     }
-    // 슬라이더 텍스트 즉시 갱신
-    ['kp', 'ki', 'kd'].forEach(id => {
-        document.getElementById(id + 'Val').innerText = document.getElementById(id).value;
-    });
+    syncSliderTexts();
 };
+
+function syncSliderTexts() {
+    ['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => {
+        const el = document.getElementById(id);
+        const valEl = document.getElementById(id + 'Val');
+        if (valEl) valEl.innerText = el.value;
+    });
+}
 
 // 탭 전환
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -128,18 +141,19 @@ function update() {
         let p_out = 0, i_out = 0, d_out = 0;
 
         if (currentMode === 'pid') {
-            // 오차 계산 (-PI ~ PI 범위 최단 거리)
             let error = targetRad - angle;
+            // 최단 경로 계산
             while (error > Math.PI) error -= Math.PI * 2;
             while (error < -Math.PI) error += Math.PI * 2;
 
             integral += error;
-            integral = Math.max(Math.min(integral, 15), -15);
+            integral = Math.max(Math.min(integral, 20), -20); // Anti-windup
             const derivative = error - prevError;
 
-            p_out = kp * 0.1 * error;
-            i_out = ki * 0.01 * integral;
-            d_out = kd * 0.5 * derivative;
+            // 제어 로직 보강 (정밀도 개선)
+            p_out = kp * 0.15 * error;
+            i_out = ki * 0.02 * integral;
+            d_out = kd * 0.8 * derivative;
             voltage = p_out + i_out + d_out;
             voltage = Math.max(Math.min(voltage, MAX_VOLTAGE), -MAX_VOLTAGE);
             prevError = error;
@@ -149,29 +163,27 @@ function update() {
         } else {
             voltage = parseFloat(elements.manualVolt.value);
             graphData.error.push(0); graphData.p.push(0); graphData.i.push(0); graphData.d.push(0);
+            integral = 0; prevError = 0; // 수동 모드 시 PID 내부 값 초기화
         }
 
         // 물리 연산
-        const motorTorque = voltage * 0.08;
+        const motorTorque = voltage * 0.1;
         const gravityTorque = gravity * Math.sin(angle);
         const angularAccel = motorTorque - gravityTorque;
 
         angularVelocity += angularAccel * 0.1;
-        
-        // RPM 제한 (속도 클램핑)
         angularVelocity = Math.max(Math.min(angularVelocity, MAX_ANGULAR_VELOCITY), -MAX_ANGULAR_VELOCITY);
-        
         angularVelocity *= damping;
         angle += angularVelocity;
 
-        // 상태 UI 업데이트
+        // UI 업데이트
         const currentDeg = (angle * (180/Math.PI)).toFixed(1);
         elements.statAngle.innerText = currentDeg;
         elements.statVel.innerText = (angularVelocity * 60 * (180/Math.PI)).toFixed(1);
         elements.statVolt.innerText = voltage.toFixed(2);
         elements.overlay.innerText = currentDeg + "°";
 
-        // 그래프 업데이트
+        // 그래프 데이터 갱신
         graphData.angle.push(parseFloat(currentDeg));
         graphData.voltage.push(voltage);
         [graphData.angle, graphData.error, graphData.voltage, graphData.p, graphData.i, graphData.d].forEach(arr => {
@@ -186,36 +198,34 @@ function update() {
 
 function draw(targetRad) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    
-    // 배경 및 축 초기화
-    ctx.fillStyle = isDark ? '#1a1a1a' : '#ffffff';
+    ctx.fillStyle = isDark ? '#1e1e1e' : '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 - 20;
 
-    // 가이드 원 및 격자
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    // 가이드 원
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
     ctx.beginPath();
     ctx.arc(cx, cy, length, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 목표 위치 (초록색 점선)
-    ctx.beginPath();
-    ctx.setLineDash([8, 6]);
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.sin(targetRad) * length, cy + Math.cos(targetRad) * length);
-    ctx.strokeStyle = '#28a745';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 궤적 표시 (주황색 아크)
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 165, 0, 0.4)';
-    ctx.lineWidth = 15;
-    ctx.arc(cx, cy, length, Math.min(angle, targetRad) + Math.PI/2, Math.max(angle, targetRad) + Math.PI/2);
-    // ctx.stroke(); // 궤적이 복잡할 수 있어 일단 주석 처리 또는 얇게 조정 가능
+    // 목표 위치 (수동 모드 아닐 때만 표시)
+    if (currentMode === 'pid') {
+        ctx.beginPath();
+        ctx.setLineDash([8, 6]);
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.sin(targetRad) * length, cy + Math.cos(targetRad) * length);
+        ctx.strokeStyle = '#28a745';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // "목표" 텍스트
+        ctx.fillStyle = '#28a745';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('목표', cx + Math.sin(targetRad) * (length + 25) - 10, cy + Math.cos(targetRad) * (length + 25) + 5);
+    }
 
     // 기어봉
     const px = cx + Math.sin(angle) * length;
@@ -233,10 +243,9 @@ function draw(targetRad) {
     ctx.arc(cx, cy, 14, 0, Math.PI * 2);
     ctx.fillStyle = isDark ? '#444' : '#bdc3c7';
     ctx.fill();
-    ctx.strokeStyle = isDark ? '#888' : '#7f8c8d';
     ctx.stroke();
 
-    // 추 (빨간 공)
+    // 추
     ctx.beginPath();
     ctx.arc(px, py, 22, 0, Math.PI * 2);
     ctx.fillStyle = '#dc3545';
@@ -246,21 +255,23 @@ function draw(targetRad) {
     ctx.stroke();
 }
 
-// 초기화 및 이벤트
+// 리셋 버튼: 모든 슬라이더와 값 초기화
 elements.resetBtn.addEventListener('click', () => {
+    ['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => {
+        document.getElementById(id).value = 0;
+    });
+    syncSliderTexts();
     angle = 0; angularVelocity = 0; integral = 0; prevError = 0;
 });
+
 elements.pauseBtn.addEventListener('click', () => {
     isPaused = !isPaused;
     elements.pauseBtn.innerText = isPaused ? '재개' : '일시정지';
 });
 
-// 슬라이더 텍스트 연동
-const sliders = ['target', 'manualVolt', 'kp', 'ki', 'kd'];
-sliders.forEach(id => {
-    const el = document.getElementById(id);
-    const valEl = document.getElementById(id + 'Val');
-    el.addEventListener('input', () => valEl.innerText = el.value);
+// 슬라이더 이벤트 연동
+['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => {
+    document.getElementById(id).addEventListener('input', syncSliderTexts);
 });
 
 // 테마 토글
@@ -269,7 +280,6 @@ elements.modeToggle.addEventListener('click', () => {
     document.documentElement.setAttribute('data-theme', theme);
     elements.modeToggle.innerText = theme === 'dark' ? '화이트 모드' : '다크 모드';
     
-    // 그래프 축 색상 업데이트
     const textColor = theme === 'dark' ? '#e0e0e0' : '#333';
     Object.values(charts).forEach(c => {
         c.options.scales.y.ticks.color = textColor;
