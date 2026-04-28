@@ -3,38 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PID 편심봉 시뮬레이션</title>
+    <title>PID Controller Study — 모터 펜싱봉 시뮬레이션</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="theme-toggle">
-        <button id="modeToggle">다크 모드</button>
-    </div>
-    <div class="container">
-        <canvas id="simCanvas" width="400" height="400"></canvas>
-        
-        <div class="controls">
-            <div class="control-group">
-                <label>목표 각도 (Target): <span id="targetVal">0</span>°</label>
-                <input type="range" id="target" min="-180" max="180" value="0">
+    <header>
+        <h1>PID Controller Study — 모터 펜싱봉 시뮬레이션</h1>
+        <div class="theme-toggle">
+            <button id="modeToggle">다크 모드</button>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- 상단: 시뮬레이션 및 제어 -->
+        <div class="top-row">
+            <section class="card sim-section">
+                <div class="card-header">모터/진자 시뮬레이션</div>
+                <div class="canvas-container">
+                    <canvas id="simCanvas" width="400" height="300"></canvas>
+                    <div id="canvasAngleOverlay">0.0°</div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-item">각도: <span id="statAngle">0.0</span>°</div>
+                    <div class="status-item">각속도: <span id="statVel">0.0</span>°/s</div>
+                    <div class="status-item">전압: <span id="statVolt">0.00</span>V</div>
+                </div>
+            </section>
+
+            <section class="card control-section">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="manual">수동 제어</button>
+                    <button class="tab-btn" data-tab="pid">PID 제어</button>
+                </div>
+                
+                <div class="tab-content active" id="manual-controls">
+                    <h3>수동 모드 — 전압 인가</h3>
+                    <div class="control-group">
+                        <label>인가 전압: <span id="manualVoltVal">0.0</span>V</label>
+                        <input type="range" id="manualVolt" min="-12" max="12" step="0.1" value="0">
+                    </div>
+                </div>
+
+                <div class="tab-content" id="pid-controls">
+                    <h3>PID 자동 제어 설정</h3>
+                    <div class="control-group">
+                        <label>목표 각도 (Target): <span id="targetVal">0</span>°</label>
+                        <input type="range" id="target" min="-180" max="180" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label>Kp (비례): <span id="kpVal">2.0</span></label>
+                        <input type="range" id="kp" min="0" max="20" step="0.1" value="2.0">
+                    </div>
+                    <div class="control-group">
+                        <label>Ki (적분): <span id="kiVal">0.05</span></label>
+                        <input type="range" id="ki" min="0" max="2" step="0.01" value="0.05">
+                    </div>
+                    <div class="control-group">
+                        <label>Kd (미분): <span id="kdVal">1.0</span></label>
+                        <input type="range" id="kd" min="0" max="10" step="0.1" value="1.0">
+                    </div>
+                </div>
+
+                <div class="action-btns">
+                    <button id="resetSim" class="btn-reset">리셋</button>
+                    <button id="pauseSim" class="btn-pause">일시정지</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- 하단: 실시간 그래프 -->
+        <div class="graph-grid">
+            <div class="card graph-card">
+                <canvas id="chartAngle"></canvas>
             </div>
-            <div class="control-group">
-                <label>P (비례) Kp: <span id="kpVal">0.0</span></label>
-                <input type="range" id="kp" min="0" max="50" step="0.1" value="0">
+            <div class="card graph-card">
+                <canvas id="chartError"></canvas>
             </div>
-            <div class="control-group">
-                <label>I (적분) Ki: <span id="kiVal">0.00</span></label>
-                <input type="range" id="ki" min="0" max="10" step="0.01" value="0">
+            <div class="card graph-card">
+                <canvas id="chartVolt"></canvas>
             </div>
-            <div class="control-group">
-                <label>D (미분) Kd: <span id="kdVal">0.0</span></label>
-                <input type="range" id="kd" min="0" max="50" step="0.1" value="0">
-            </div>
-            <div class="control-group">
-                <button id="resetSim" style="width: 100%; padding: 10px; cursor: pointer;">시뮬레이션 리셋</button>
+            <div class="card graph-card">
+                <canvas id="chartPID"></canvas>
             </div>
         </div>
-    </div>
+    </main>
+
     <script src="script.js"></script>
 </body>
 </html>
