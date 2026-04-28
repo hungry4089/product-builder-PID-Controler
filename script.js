@@ -21,24 +21,21 @@ const elements = {
     kdVal: document.getElementById('kdVal')
 };
 
-// --- 정밀 물리 모델 상수 ---
+// --- 고정밀 물리 모델 상수 (출렁거림 극대화) ---
 let isPaused = false;
 let currentMode = 'manual';
-let angle = 0;           // 라디안 (0 = 수직 아래)
-let angularVelocity = 0; // rad/s
+let angle = 0;           
+let angularVelocity = 0; 
 let integral = 0;
 let prevError = 0;
 
-const M = 5.0;           // 질량: 5kg (묵직함 부여)
-const L = 0.25;          // 막대 길이: 25cm
-const G = 9.81;          // 중력 가속도
+const M = 5.0;           // 5kg (묵직한 무게)
+const L = 0.25;          // 25cm
+const G = 9.81;          
 const I = M * L * L;     // 관성 모멘트
-const B = 2.5;           // 마찰/감쇠 계수 (속도 평형을 위해 조정)
-const KT = 1.5;          // 토크 상수 (전압당 토크)
-const DT = 1 / 60;       // 타임 스텝
-
-// RPM 제한: 수동 최대 전압 시 2초에 1바퀴 (PI rad/s) 근처로 수렴 유도
-// (물리 엔진 자체에서 마찰과 토크의 평형으로 자연스럽게 구현됨)
+const B = 0.45;          // 감쇠 계수: 대폭 인하 (2.5 -> 0.45) - 출렁거림 유도
+const KT = 0.85;         // 토크 상수: 마찰 감소에 맞춰 조정 (2초에 1바퀴 유지용)
+const DT = 1 / 60;       
 
 // --- 그래프 데이터 ---
 const MAX_POINTS = 100;
@@ -50,7 +47,6 @@ const graphData = {
     p: Array(MAX_POINTS).fill(0), i: Array(MAX_POINTS).fill(0), d: Array(MAX_POINTS).fill(0)
 };
 
-// Chart.js 설정 (요동 방지를 위한 suggested range 적용)
 const getChartOptions = (yMin, yMax, suggest = false) => ({
     responsive: true, maintainAspectRatio: false, animation: false,
     scales: { 
@@ -90,12 +86,12 @@ const charts = {
 
 // --- 로직 및 업데이트 ---
 window.setPreset = (type) => {
-    // 무거운 질량에 최적화된 게인값
+    // 흔들림이 커진 시스템에 맞춘 프리셋
     const presets = {
-        'P': [60, 0, 0],
-        'PD': [60, 0, 15],
-        'PID': [60, 20, 10],
-        'AGGRESSIVE': [100, 40, 5]
+        'P': [30, 0, 0],
+        'PD': [40, 0, 8],
+        'PID': [40, 15, 10],
+        'AGGRESSIVE': [80, 30, 5]
     };
     const [p, i, d] = presets[type];
     elements.kp.value = p; elements.ki.value = i; elements.kd.value = d;
@@ -136,39 +132,31 @@ function update() {
             while (error < -Math.PI) error += Math.PI * 2;
 
             integral += error * DT;
-            integral = Math.max(Math.min(integral, 10), -10); // Anti-windup
+            integral = Math.max(Math.min(integral, 10), -10); 
             const derivative = (error - prevError) / DT;
 
-            p_out = (kp * 0.8) * error;
-            i_out = (ki * 0.8) * integral;
+            // 흔들림을 더 잘 보여주기 위해 게인 감도 조정
+            p_out = (kp * 0.4) * error;
+            i_out = (ki * 0.5) * integral;
             d_out = (kd * 0.1) * derivative;
             motorTorque = p_out + i_out + d_out;
-            motorTorque = Math.max(Math.min(motorTorque, 20), -20); // 최대 토크 제한
+            motorTorque = Math.max(Math.min(motorTorque, 25), -25);
 
             prevError = error;
             graphData.error.push(error * (180/Math.PI));
             graphData.p.push(p_out); graphData.i.push(i_out); graphData.d.push(d_out);
         } else {
-            // 수동 모드: 전압을 토크로 변환 (KT 상수를 곱함)
-            const volt = parseFloat(elements.manualVolt.value);
-            motorTorque = volt * KT;
+            motorTorque = parseFloat(elements.manualVolt.value) * KT;
             graphData.error.push(0); graphData.p.push(0); graphData.i.push(0); graphData.d.push(0);
         }
 
         // --- 물리 시뮬레이션 엔진 ---
-        // 1. 중력 토크: τ_g = mgl * sin(θ)
         const gravityTorque = M * G * L * Math.sin(angle);
-        
-        // 2. 마찰/감쇠 토크: τ_f = B * ω
         const frictionTorque = B * angularVelocity;
-        
-        // 3. 알짜 토크: τ_net = τ_motor - τ_g - τ_f
         const netTorque = motorTorque - gravityTorque - frictionTorque;
 
-        // 4. 각가속도 계산: α = τ / I
         const angularAcceleration = netTorque / I;
 
-        // 5. 적분 (오일러 방식)
         angularVelocity += angularAcceleration * DT;
         angle += angularVelocity * DT;
 
@@ -200,11 +188,9 @@ function draw(targetRad) {
     const cy = canvas.height / 2 - 20;
     const drawL = 140;
 
-    // 가이드 원
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
     ctx.beginPath(); ctx.arc(cx, cy, drawL, 0, Math.PI * 2); ctx.stroke();
 
-    // 목표 가이드 (PID 전용)
     if (currentMode === 'pid') {
         ctx.beginPath();
         ctx.setLineDash([8, 6]);
@@ -218,22 +204,19 @@ function draw(targetRad) {
         ctx.fillText('목표', cx + Math.sin(targetRad) * (drawL + 25) - 10, cy + Math.cos(targetRad) * (drawL + 25) + 5);
     }
 
-    // 막대기
     const px = cx + Math.sin(angle) * drawL;
     const py = cy + Math.cos(angle) * drawL;
     ctx.beginPath();
     ctx.moveTo(cx, cy); ctx.lineTo(px, py);
     ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50';
-    ctx.lineWidth = 10; // 무게감 표현을 위해 두껍게
+    ctx.lineWidth = 10;
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // 모터 축
     ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2);
     ctx.fillStyle = isDark ? '#444' : '#bdc3c7';
     ctx.fill(); ctx.stroke();
 
-    // 무거운 추
     ctx.beginPath(); ctx.arc(px, py, 25, 0, Math.PI * 2);
     ctx.fillStyle = '#dc3545';
     ctx.fill(); ctx.strokeStyle = isDark ? '#fff' : '#000';
