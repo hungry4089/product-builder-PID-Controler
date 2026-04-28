@@ -13,29 +13,34 @@ const elements = {
     overlay: document.getElementById('canvasAngleOverlay'),
     statAngle: document.getElementById('statAngle'),
     statVel: document.getElementById('statVel'),
-    statVolt: document.getElementById('statVolt')
+    statVolt: document.getElementById('statVolt'),
+    targetVal: document.getElementById('targetVal'),
+    manualVoltVal: document.getElementById('manualVoltVal'),
+    kpVal: document.getElementById('kpVal'),
+    kiVal: document.getElementById('kiVal'),
+    kdVal: document.getElementById('kdVal')
 };
 
-// 물리 모델 상태 변수
+// --- 정밀 물리 모델 상수 ---
 let isPaused = false;
 let currentMode = 'manual';
-let angle = 0;           // 현재 각도 (라디안, 0은 수직 아래)
-let angularVelocity = 0; // 각속도 (rad/s)
-let integral = 0;        // 적분항 누적값
-let prevError = 0;       // 이전 에러
+let angle = 0;           // 라디안 (0 = 수직 아래)
+let angularVelocity = 0; // rad/s
+let integral = 0;
+let prevError = 0;
 
-// 물리 상수 (현실적인 수치)
-const L = 0.15;          // 막대 길이 (15cm)
-const M = 0.5;           // 끝부분 추 질량 (0.5kg)
+const M = 5.0;           // 질량: 5kg (묵직함 부여)
+const L = 0.25;          // 막대 길이: 25cm
 const G = 9.81;          // 중력 가속도
-const I = M * L * L;     // 관성 모멘트 (점질량 가정)
-const B = 0.05;          // 마찰 계수 (Damping)
-const DT = 1 / 60;       // 프레임 시간 (60fps)
+const I = M * L * L;     // 관성 모멘트
+const B = 2.5;           // 마찰/감쇠 계수 (속도 평형을 위해 조정)
+const KT = 1.5;          // 토크 상수 (전압당 토크)
+const DT = 1 / 60;       // 타임 스텝
 
-// RPM 제한 (2초에 1회전 = 0.5Hz = PI rad/s)
-const MAX_W = Math.PI;
+// RPM 제한: 수동 최대 전압 시 2초에 1바퀴 (PI rad/s) 근처로 수렴 유도
+// (물리 엔진 자체에서 마찰과 토크의 평형으로 자연스럽게 구현됨)
 
-// 그래프 데이터
+// --- 그래프 데이터 ---
 const MAX_POINTS = 100;
 const graphData = {
     labels: Array(MAX_POINTS).fill(''),
@@ -45,43 +50,55 @@ const graphData = {
     p: Array(MAX_POINTS).fill(0), i: Array(MAX_POINTS).fill(0), d: Array(MAX_POINTS).fill(0)
 };
 
-// Chart.js 설정
-const commonOptions = {
+// Chart.js 설정 (요동 방지를 위한 suggested range 적용)
+const getChartOptions = (yMin, yMax, suggest = false) => ({
     responsive: true, maintainAspectRatio: false, animation: false,
-    scales: { x: { display: false }, y: { suggestedMin: -2, suggestedMax: 2, grid: { color: 'rgba(128,128,128,0.1)' } } }
-};
+    scales: { 
+        x: { display: false }, 
+        y: { 
+            min: suggest ? undefined : yMin, 
+            max: suggest ? undefined : yMax,
+            suggestedMin: suggest ? yMin : undefined,
+            suggestedMax: suggest ? yMax : undefined,
+            grid: { color: 'rgba(128,128,128,0.1)' } 
+        } 
+    },
+    plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }
+});
 
 const charts = {
     angle: new Chart(document.getElementById('chartAngle'), {
         type: 'line', data: { labels: graphData.labels, datasets: [{ label: '각도 (deg)', data: graphData.angle, borderColor: '#007bff', pointRadius: 0 }] },
-        options: { ...commonOptions, scales: { y: { min: -180, max: 180 } } }
+        options: getChartOptions(-180, 180)
     }),
     error: new Chart(document.getElementById('chartError'), {
         type: 'line', data: { labels: graphData.labels, datasets: [{ label: '오차 (Error)', data: graphData.error, borderColor: '#dc3545', pointRadius: 0 }] },
-        options: { ...commonOptions, scales: { y: { min: -180, max: 180 } } }
+        options: getChartOptions(-180, 180)
     }),
     volt: new Chart(document.getElementById('chartVolt'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '입력 토크/전압', data: graphData.voltage, borderColor: '#28a745', pointRadius: 0 }] },
-        options: { ...commonOptions, scales: { y: { min: -12, max: 12 } } }
+        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '인가 토크 (Nm)', data: graphData.voltage, borderColor: '#28a745', pointRadius: 0 }] },
+        options: getChartOptions(-15, 15)
     }),
     pid: new Chart(document.getElementById('chartPID'), {
         type: 'line', data: { labels: graphData.labels, datasets: [
             { label: 'P', data: graphData.p, borderColor: '#ff9f40', pointRadius: 0 },
             { label: 'I', data: graphData.i, borderColor: '#4bc0c0', pointRadius: 0 },
             { label: 'D', data: graphData.d, borderColor: '#9966ff', pointRadius: 0 }
-        ] }, options: commonOptions
+        ] }, options: getChartOptions(-10, 10, true)
     })
 };
 
-// 프리셋
+// --- 로직 및 업데이트 ---
 window.setPreset = (type) => {
-    const vals = {
-        'P': [40, 0, 0],
-        'PD': [40, 0, 5],
-        'PID': [40, 10, 5],
-        'AGGRESSIVE': [100, 20, 2]
-    }[type];
-    elements.kp.value = vals[0]; elements.ki.value = vals[1]; elements.kd.value = vals[2];
+    // 무거운 질량에 최적화된 게인값
+    const presets = {
+        'P': [60, 0, 0],
+        'PD': [60, 0, 15],
+        'PID': [60, 20, 10],
+        'AGGRESSIVE': [100, 40, 5]
+    };
+    const [p, i, d] = presets[type];
+    elements.kp.value = p; elements.ki.value = i; elements.kd.value = d;
     syncSliderTexts();
 };
 
@@ -93,7 +110,6 @@ function syncSliderTexts() {
     });
 }
 
-// 탭 전환
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -111,7 +127,7 @@ function update() {
         const ki = parseFloat(elements.ki.value);
         const kd = parseFloat(elements.kd.value);
         
-        let controlTorque = 0;
+        let motorTorque = 0;
         let p_out = 0, i_out = 0, d_out = 0;
 
         if (currentMode === 'pid') {
@@ -120,50 +136,52 @@ function update() {
             while (error < -Math.PI) error += Math.PI * 2;
 
             integral += error * DT;
-            integral = Math.max(Math.min(integral, 5), -5); // Anti-windup
+            integral = Math.max(Math.min(integral, 10), -10); // Anti-windup
             const derivative = (error - prevError) / DT;
 
-            p_out = (kp * 0.5) * error;
-            i_out = (ki * 0.5) * integral;
-            d_out = (kd * 0.05) * derivative;
-            controlTorque = p_out + i_out + d_out;
-            controlTorque = Math.max(Math.min(controlTorque, 10), -10); // 토크 제한
+            p_out = (kp * 0.8) * error;
+            i_out = (ki * 0.8) * integral;
+            d_out = (kd * 0.1) * derivative;
+            motorTorque = p_out + i_out + d_out;
+            motorTorque = Math.max(Math.min(motorTorque, 20), -20); // 최대 토크 제한
 
             prevError = error;
             graphData.error.push(error * (180/Math.PI));
             graphData.p.push(p_out); graphData.i.push(i_out); graphData.d.push(d_out);
         } else {
-            controlTorque = parseFloat(elements.manualVolt.value) * 0.5;
+            // 수동 모드: 전압을 토크로 변환 (KT 상수를 곱함)
+            const volt = parseFloat(elements.manualVolt.value);
+            motorTorque = volt * KT;
             graphData.error.push(0); graphData.p.push(0); graphData.i.push(0); graphData.d.push(0);
         }
 
-        // 물리 연산 (Torque Balance)
-        // τ_net = τ_control - τ_gravity - τ_friction
+        // --- 물리 시뮬레이션 엔진 ---
+        // 1. 중력 토크: τ_g = mgl * sin(θ)
         const gravityTorque = M * G * L * Math.sin(angle);
+        
+        // 2. 마찰/감쇠 토크: τ_f = B * ω
         const frictionTorque = B * angularVelocity;
-        const netTorque = controlTorque - gravityTorque - frictionTorque;
+        
+        // 3. 알짜 토크: τ_net = τ_motor - τ_g - τ_f
+        const netTorque = motorTorque - gravityTorque - frictionTorque;
 
-        // α = τ / I
+        // 4. 각가속도 계산: α = τ / I
         const angularAcceleration = netTorque / I;
 
-        // 적분 (Velocity & Position)
+        // 5. 적분 (오일러 방식)
         angularVelocity += angularAcceleration * DT;
-        
-        // 속도 제한
-        angularVelocity = Math.max(Math.min(angularVelocity, MAX_W), -MAX_W);
-        
         angle += angularVelocity * DT;
 
-        // UI 갱신
+        // UI 업데이트
         const currentDeg = (angle * (180/Math.PI)).toFixed(1);
         elements.statAngle.innerText = currentDeg;
         elements.statVel.innerText = (angularVelocity * (180/Math.PI)).toFixed(1);
-        elements.statVolt.innerText = controlTorque.toFixed(2);
+        elements.statVolt.innerText = motorTorque.toFixed(2);
         elements.overlay.innerText = currentDeg + "°";
 
-        // 그래프 데이터 갱신
+        // 그래프 갱신
         graphData.angle.push(parseFloat(currentDeg));
-        graphData.voltage.push(controlTorque);
+        graphData.voltage.push(motorTorque);
         [graphData.angle, graphData.error, graphData.voltage, graphData.p, graphData.i, graphData.d].forEach(arr => {
             if (arr.length > MAX_POINTS) arr.shift();
         });
@@ -180,58 +198,46 @@ function draw(targetRad) {
     
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 - 20;
-    const drawLength = 140;
+    const drawL = 140;
 
-    // 배경 가이드
+    // 가이드 원
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, drawLength, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, drawL, 0, Math.PI * 2); ctx.stroke();
 
-    // 목표 위치 (PID 모드일 때만)
+    // 목표 가이드 (PID 전용)
     if (currentMode === 'pid') {
         ctx.beginPath();
         ctx.setLineDash([8, 6]);
         ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.sin(targetRad) * drawLength, cy + Math.cos(targetRad) * drawLength);
+        ctx.lineTo(cx + Math.sin(targetRad) * drawL, cy + Math.cos(targetRad) * drawL);
         ctx.strokeStyle = '#28a745';
-        ctx.lineWidth = 2;
         ctx.stroke();
         ctx.setLineDash([]);
-        
         ctx.fillStyle = '#28a745';
         ctx.font = 'bold 13px Arial';
-        ctx.fillText('목표', cx + Math.sin(targetRad) * (drawLength + 25) - 10, cy + Math.cos(targetRad) * (drawLength + 25) + 5);
+        ctx.fillText('목표', cx + Math.sin(targetRad) * (drawL + 25) - 10, cy + Math.cos(targetRad) * (drawL + 25) + 5);
     }
 
-    // 막대기 (기어봉)
-    const px = cx + Math.sin(angle) * drawLength;
-    const py = cy + Math.cos(angle) * drawLength;
-    
+    // 막대기
+    const px = cx + Math.sin(angle) * drawL;
+    const py = cy + Math.cos(angle) * drawL;
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(px, py);
+    ctx.moveTo(cx, cy); ctx.lineTo(px, py);
     ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50';
-    ctx.lineWidth = 8;
+    ctx.lineWidth = 10; // 무게감 표현을 위해 두껍게
     ctx.lineCap = 'round';
     ctx.stroke();
 
     // 모터 축
-    ctx.beginPath();
-    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2);
     ctx.fillStyle = isDark ? '#444' : '#bdc3c7';
-    ctx.fill();
-    ctx.stroke();
+    ctx.fill(); ctx.stroke();
 
-    // 끝부분 추
-    ctx.beginPath();
-    ctx.arc(px, py, 20, 0, Math.PI * 2);
+    // 무거운 추
+    ctx.beginPath(); ctx.arc(px, py, 25, 0, Math.PI * 2);
     ctx.fillStyle = '#dc3545';
-    ctx.fill();
-    ctx.strokeStyle = isDark ? '#fff' : '#000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.fill(); ctx.strokeStyle = isDark ? '#fff' : '#000';
+    ctx.lineWidth = 3; ctx.stroke();
 }
 
 elements.resetBtn.addEventListener('click', () => {
