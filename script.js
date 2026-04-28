@@ -8,7 +8,6 @@ const elements = {
     ki: document.getElementById('ki'),
     kd: document.getElementById('kd'),
     manualVolt: document.getElementById('manualVolt'),
-    modeToggle: document.getElementById('modeToggle'),
     resetBtn: document.getElementById('resetSim'),
     pauseBtn: document.getElementById('pauseSim'),
     overlay: document.getElementById('canvasAngleOverlay'),
@@ -220,15 +219,14 @@ function update() {
 }
 
 function draw(targetRad) {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cx = canvas.width / 2, cy = canvas.height / 2, drawL = 140;
 
     // 배경 눈금
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.font = '8px Arial';
     ctx.textAlign = 'center';
     for (let i = 0; i < 360; i += 30) {
@@ -245,7 +243,7 @@ function draw(targetRad) {
     // 중력 가이드
     ctx.save();
     ctx.setLineDash([2, 2]);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + drawL + 15); ctx.stroke();
     ctx.restore();
 
@@ -260,19 +258,19 @@ function draw(targetRad) {
     ctx.translate(cx, cy);
     ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2);
     const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 18);
-    grad.addColorStop(0, isDark ? '#444' : '#eee'); grad.addColorStop(1, isDark ? '#222' : '#ccc');
-    ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = isDark ? '#333' : '#bbb'; ctx.stroke();
+    grad.addColorStop(0, '#eee'); grad.addColorStop(1, '#ccc');
+    ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = '#bbb'; ctx.stroke();
     ctx.restore();
 
     // 막대기 (Thinner rod)
     const px = cx + Math.sin(angle) * drawL, py = cy + Math.cos(angle) * drawL;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
 
     // 샤프트 & 추
-    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = isDark ? '#777' : '#666'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = '#666'; ctx.fill();
     ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2); ctx.fillStyle = '#dc3545'; ctx.fill();
-    ctx.strokeStyle = isDark ? '#fff' : '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
 // 이벤트
@@ -298,12 +296,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 ['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => {
     document.getElementById(id).addEventListener('input', syncSliderTexts);
-});
-
-elements.modeToggle.addEventListener('click', () => {
-    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-    elements.modeToggle.innerText = theme === 'dark' ? '화이트 모드' : '다크 모드';
 });
 
 function syncSliderTexts() {

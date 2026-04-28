@@ -9,13 +9,6 @@
     --accent-red: #dc3545;
 }
 
-[data-theme="dark"] {
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
-    --text-color: #e4e6eb;
-    --border-color: #333333;
-}
-
 body {
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-color);
@@ -124,4 +117,3 @@ h3 { font-size: 0.85rem; margin: 0 0 5px 0; }
 .chart-wrap { flex: 1; position: relative; height: 100%; min-width: 0; }
 
 input[type="range"] { width: 100%; height: 3px; }
-.theme-toggle button { font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; cursor: pointer; background: transparent; border: 1px solid var(--border-color); color: var(--text-color); }
