@@ -55,11 +55,11 @@ const valueLabelPlugin = {
         const {ctx, data, chartArea: {top, right}} = chart;
         ctx.save();
         ctx.fillStyle = chart.options.plugins.valueLabel.color || '#007bff';
-        ctx.font = 'bold 11px Arial';
+        ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'right';
         const lastValue = data.datasets[0].data[data.datasets[0].data.length - 1];
         if (typeof lastValue === 'number') {
-            ctx.fillText(lastValue.toFixed(1) + (chart.options.plugins.valueLabel.unit || ''), right - 5, top + 12);
+            ctx.fillText(lastValue.toFixed(1) + (chart.options.plugins.valueLabel.unit || ''), right - 5, top + 10);
         }
         ctx.restore();
     }
@@ -70,10 +70,10 @@ const getChartOptions = (yMin, yMax, unit = '', color = '#007bff') => ({
     responsive: true, maintainAspectRatio: false, animation: false,
     scales: { 
         x: { display: false }, 
-        y: { min: yMin, max: yMax, grid: { color: 'rgba(128,128,128,0.06)' }, ticks: { font: { size: 9 } } } 
+        y: { min: yMin, max: yMax, grid: { color: 'rgba(128,128,128,0.06)' }, ticks: { font: { size: 8 } } } 
     },
     plugins: { 
-        legend: { labels: { boxWidth: 8, font: { size: 9 } } },
+        legend: { labels: { boxWidth: 8, font: { size: 8 } } },
         valueLabel: { unit: unit, color: color }
     }
 });
@@ -84,18 +84,18 @@ const charts = {
         data: { 
             labels: graphData.labels, 
             datasets: [
-                { label: '각도', data: graphData.angle, borderColor: '#007bff', borderWidth: 1.5, pointRadius: 0 },
-                { label: '목표', data: graphData.target, borderColor: '#28a745', borderWidth: 1, borderDash: [3, 3], pointRadius: 0 }
+                { label: '각도', data: graphData.angle, borderColor: '#007bff', borderWidth: 1.2, pointRadius: 0 },
+                { label: '목표', data: graphData.target, borderColor: '#28a745', borderWidth: 1, borderDash: [2, 2], pointRadius: 0 }
             ] 
         },
         options: getChartOptions(-180, 180, '°', '#007bff')
     }),
     error: new Chart(document.getElementById('chartError'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '오차', data: graphData.error, borderColor: '#dc3545', borderWidth: 1.5, pointRadius: 0 }] },
+        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '오차', data: graphData.error, borderColor: '#dc3545', borderWidth: 1.2, pointRadius: 0 }] },
         options: getChartOptions(-180, 180, '°', '#dc3545')
     }),
     volt: new Chart(document.getElementById('chartVolt'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '토크(Nm)', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.5, pointRadius: 0 }] },
+        type: 'line', data: { labels: graphData.labels, datasets: [{ label: '토크(Nm)', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.2, pointRadius: 0 }] },
         options: getChartOptions(-20, 20, ' Nm', '#28a745')
     }),
     pid: new Chart(document.getElementById('chartPID'), {
@@ -195,96 +195,80 @@ function draw(targetRad) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const cx = canvas.width / 2;
-    const cy = canvas.height / 2 - 10;
-    const drawL = 100; // 길이 증가 (75 -> 100)
+    const cy = canvas.height / 2;
+    const drawL = 100;
 
-    // 1. 눈금판 배경 (Degree Scale)
+    // 1. 눈금판 배경
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
-    ctx.font = '9px Arial';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+    ctx.font = '8px Arial';
     ctx.textAlign = 'center';
 
     for (let i = 0; i < 360; i += 30) {
         const rad = (i - 90) * (Math.PI / 180);
         const x1 = Math.cos(rad) * (drawL + 5);
         const y1 = Math.sin(rad) * (drawL + 5);
-        const x2 = Math.cos(rad) * (drawL + 15);
-        const y2 = Math.sin(rad) * (drawL + 15);
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
+        const x2 = Math.cos(rad) * (drawL + 12);
+        const y2 = Math.sin(rad) * (drawL + 12);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
         const label = i <= 180 ? i : i - 360;
-        const tx = Math.cos(rad) * (drawL + 25);
-        const ty = Math.sin(rad) * (drawL + 25) + 3;
-        ctx.fillText(label + '°', tx, ty);
+        const tx = Math.cos(rad) * (drawL + 20);
+        const ty = Math.sin(rad) * (drawL + 20) + 3;
+        ctx.fillText(label, tx, ty);
     }
     ctx.restore();
 
-    // 2. 현재 모드 표시 배지
+    // 2. 모드 배지
     ctx.save();
-    const modeText = currentMode === 'manual' ? 'MANUAL MODE' : 'PID CONTROL';
+    const modeText = currentMode === 'manual' ? 'MANUAL' : 'PID CONTROL';
     const modeColor = currentMode === 'manual' ? '#fd7e14' : '#28a745';
     ctx.fillStyle = modeColor;
-    ctx.font = 'bold 10px Arial';
-    ctx.fillRect(10, 10, 85, 18);
+    ctx.font = 'bold 9px Arial';
+    ctx.fillRect(8, 8, 70, 16);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.fillText(modeText, 52.5, 23);
+    ctx.fillText(modeText, 43, 19);
     ctx.restore();
 
     // 3. 중력 가이드
     ctx.save();
     ctx.setLineDash([2, 2]);
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx, cy + drawL + 20);
-    ctx.stroke();
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + drawL + 15); ctx.stroke();
     ctx.restore();
 
-    // 4. 목표 위치 (PID 전용)
+    // 4. 목표 위치
     if (currentMode === 'pid') {
         ctx.beginPath(); ctx.setLineDash([4, 3]);
         ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(targetRad) * drawL, cy + Math.cos(targetRad) * drawL);
-        ctx.strokeStyle = '#28a745'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = '#28a745'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
     }
 
-    // 5. 모터 본체 (Housing)
+    // 5. 모터 본체
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.beginPath();
-    ctx.arc(0, 0, 20, 0, Math.PI * 2);
-    const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 20);
-    grad.addColorStop(0, isDark ? '#555' : '#ddd');
-    grad.addColorStop(1, isDark ? '#333' : '#bbb');
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.strokeStyle = isDark ? '#444' : '#aaa';
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 18);
+    grad.addColorStop(0, isDark ? '#444' : '#eee');
+    grad.addColorStop(1, isDark ? '#222' : '#ccc');
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = isDark ? '#333' : '#bbb'; ctx.stroke();
     ctx.restore();
 
-    // 6. 막대기 (Thinner rod)
+    // 6. 막대기
     const px = cx + Math.sin(angle) * drawL;
     const py = cy + Math.cos(angle) * drawL;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; 
-    ctx.lineWidth = 3; // 두께 대폭 축소 (5 -> 3)
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
 
-    // 7. 모터 샤프트
-    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = isDark ? '#888' : '#666'; ctx.fill();
-
-    // 8. 추
-    ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#dc3545'; ctx.fill(); ctx.strokeStyle = isDark ? '#fff' : '#000';
-    ctx.lineWidth = 2; ctx.stroke();
+    // 7. 샤프트 & 추
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = isDark ? '#777' : '#666'; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2);
+    ctx.fillStyle = '#dc3545'; ctx.fill();
+    ctx.strokeStyle = isDark ? '#fff' : '#000'; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
 // 이벤트
@@ -301,10 +285,8 @@ elements.pauseBtn.addEventListener('click', () => {
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         currentMode = btn.getAttribute('data-tab');
-        document.getElementById(currentMode + '-controls').classList.add('active');
         dashboard.setAttribute('data-mode', currentMode);
     });
 });
