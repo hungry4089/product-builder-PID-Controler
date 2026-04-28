@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PID Controller — 모터 편심봉 시뮬레이션</title>
+    <title>PID Controller Study — 모터 편심봉 시뮬레이션</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <header>
@@ -20,7 +20,7 @@
             <section class="card sim-section">
                 <div class="card-header">모터/진자 시뮬레이션</div>
                 <div class="canvas-container" id="canvasContainer">
-                    <canvas id="simCanvas" width="400" height="300"></canvas>
+                    <canvas id="simCanvas" width="500" height="400"></canvas>
                     <div id="canvasAngleOverlay">0.0°</div>
                 </div>
                 <div class="status-bar">
@@ -39,7 +39,7 @@
                 <div id="manual-controls" class="tab-content">
                     <h3>수동 모드 — 전압 인가</h3>
                     <div class="control-group">
-                        <label>인가 전압 <span id="manualVoltVal">0.0</span>V</label>
+                        <label>인가 전압 <span><span id="manualVoltVal">0.0</span>V</span></label>
                         <input type="range" id="manualVolt" min="-12" max="12" step="0.1" value="0">
                     </div>
                 </div>
@@ -47,19 +47,19 @@
                 <div id="pid-controls" class="tab-content">
                     <h3>PID 자동 제어 모드</h3>
                     <div class="control-group">
-                        <label>목표 각도 <span id="targetVal">0</span>°</label>
+                        <label>목표 각도 <span><span id="targetVal">0</span>°</span></label>
                         <input type="range" id="target" min="-180" max="180" value="0">
                     </div>
                     <div class="control-group">
-                        <label>Kp (비례) <span id="kpVal">0.0</span></label>
+                        <label>Kp (비례) <span><span id="kpVal">0.0</span></span></label>
                         <input type="range" id="kp" min="0" max="200" step="1" value="0">
                     </div>
                     <div class="control-group">
-                        <label>Ki (적분) <span id="kiVal">0.0</span></label>
+                        <label>Ki (적분) <span><span id="kiVal">0.0</span></span></label>
                         <input type="range" id="ki" min="0" max="50" step="0.1" value="0">
                     </div>
                     <div class="control-group">
-                        <label>Kd (미분) <span id="kdVal">0.0</span></label>
+                        <label>Kd (미분) <span><span id="kdVal">0.0</span></span></label>
                         <input type="range" id="kd" min="0" max="50" step="0.1" value="0">
                     </div>
                     <div class="preset-btns">
@@ -71,40 +71,39 @@
                 </div>
 
                 <div class="action-btns">
-                    <button id="resetSim" class="btn-reset">모든 값 리셋</button>
+                    <button id="resetSim" class="btn-reset">리셋</button>
                     <button id="pauseSim" class="btn-pause">일시정지</button>
                 </div>
             </section>
         </div>
 
-        <!-- 하단 그래프 영역: 좌측(Fixed) / 우측(Dynamic) 분할 -->
         <div class="graph-grid">
             <div class="card graph-card">
-                <div class="graph-label">각도 (Fixed | Dynamic)</div>
+                <div class="graph-label">각도 [±180° | 적응형]</div>
                 <div class="split-container">
-                    <canvas id="chartAngleFixed"></canvas>
-                    <canvas id="chartAngleDynamic"></canvas>
+                    <div class="chart-wrap"><canvas id="chartAngleFixed"></canvas></div>
+                    <div class="chart-wrap"><canvas id="chartAngleDynamic"></canvas></div>
                 </div>
             </div>
             <div class="card graph-card">
-                <div class="graph-label">오차 (Fixed | Dynamic)</div>
+                <div class="graph-label">오차 [±180° | 적응형]</div>
                 <div class="split-container">
-                    <canvas id="chartErrorFixed"></canvas>
-                    <canvas id="chartErrorDynamic"></canvas>
+                    <div class="chart-wrap"><canvas id="chartErrorFixed"></canvas></div>
+                    <div class="chart-wrap"><canvas id="chartErrorDynamic"></canvas></div>
                 </div>
             </div>
             <div class="card graph-card">
-                <div class="graph-label">토크 (Fixed | Dynamic)</div>
+                <div class="graph-label">인가 토크 [±25Nm | 적응형]</div>
                 <div class="split-container">
-                    <canvas id="chartVoltFixed"></canvas>
-                    <canvas id="chartVoltDynamic"></canvas>
+                    <div class="chart-wrap"><canvas id="chartVoltFixed"></canvas></div>
+                    <div class="chart-wrap"><canvas id="chartVoltDynamic"></canvas></div>
                 </div>
             </div>
             <div class="card graph-card">
-                <div class="graph-label">PID 성분 (Fixed | Dynamic)</div>
+                <div class="graph-label">PID 성분 [±15 | 적응형]</div>
                 <div class="split-container">
-                    <canvas id="chartPIDFixed"></canvas>
-                    <canvas id="chartPIDDynamic"></canvas>
+                    <div class="chart-wrap"><canvas id="chartPIDFixed"></canvas></div>
+                    <div class="chart-wrap"><canvas id="chartPIDDynamic"></canvas></div>
                 </div>
             </div>
         </div>

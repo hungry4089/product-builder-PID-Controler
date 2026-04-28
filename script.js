@@ -39,7 +39,7 @@ const KT = 1.7;
 const DT = 1 / 60;       
 
 // --- 그래프 데이터 ---
-const MAX_POINTS = 80;
+const MAX_POINTS = 60; // 렌더링 성능을 위해 데이터 포인트 조절
 const graphData = {
     labels: Array(MAX_POINTS).fill(''),
     angle: Array(MAX_POINTS).fill(0),
@@ -49,7 +49,7 @@ const graphData = {
     p: Array(MAX_POINTS).fill(0), i: Array(MAX_POINTS).fill(0), d: Array(MAX_POINTS).fill(0)
 };
 
-// 동적 스케일 관리 변수
+// 동적 스케일 관리
 const dynBounds = {
     angle: { min: -10, max: 10 },
     error: { min: -10, max: 10 },
@@ -57,20 +57,23 @@ const dynBounds = {
     pid: { min: -10, max: 10 }
 };
 
-// 공통 차트 옵션 생성
-const getBaseOptions = (title, unit, color, isFixed, yMin, yMax) => ({
-    responsive: true, maintainAspectRatio: false, animation: false,
+// 공통 차트 옵션
+const getBaseOptions = (isFixed, yMin, yMax) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    elements: { line: { tension: 0.1 } },
     scales: { 
         x: { display: false }, 
         y: { 
             min: isFixed ? yMin : undefined,
             max: isFixed ? yMax : undefined,
-            grid: { color: 'rgba(128,128,128,0.06)' },
-            ticks: { font: { size: 7 }, display: isFixed } // 고정 그래프만 눈금 표시
+            grid: { color: 'rgba(128,128,128,0.08)' },
+            ticks: { font: { size: 7 }, display: isFixed }
         } 
     },
     plugins: { 
-        legend: { display: !isFixed, labels: { boxWidth: 5, font: { size: 7 } } },
+        legend: { display: false },
         tooltip: { enabled: false }
     }
 });
@@ -78,46 +81,45 @@ const getBaseOptions = (title, unit, color, isFixed, yMin, yMax) => ({
 // 차트 초기화
 const charts = {
     angleF: new Chart(document.getElementById('chartAngleFixed'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Fixed', data: graphData.angle, borderColor: '#007bff', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Angle', '°', '#007bff', true, -180, 180)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.angle, borderColor: '#007bff', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(true, -180, 180)
     }),
     angleD: new Chart(document.getElementById('chartAngleDynamic'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Angle', data: graphData.angle, borderColor: '#007bff', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Angle', '°', '#007bff', false)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.angle, borderColor: '#007bff', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(false)
     }),
     errorF: new Chart(document.getElementById('chartErrorFixed'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Fixed', data: graphData.error, borderColor: '#dc3545', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Error', '°', '#dc3545', true, -180, 180)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.error, borderColor: '#dc3545', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(true, -180, 180)
     }),
     errorD: new Chart(document.getElementById('chartErrorDynamic'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Error', data: graphData.error, borderColor: '#dc3545', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Error', '°', '#dc3545', false)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.error, borderColor: '#dc3545', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(false)
     }),
     voltF: new Chart(document.getElementById('chartVoltFixed'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Fixed', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Torque', 'Nm', '#28a745', true, -25, 25)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(true, -25, 25)
     }),
     voltD: new Chart(document.getElementById('chartVoltDynamic'), {
-        type: 'line', data: { labels: graphData.labels, datasets: [{ label: 'Torque', data: graphData.voltage, borderColor: '#28a745', borderWidth: 1, pointRadius: 0 }] },
-        options: getBaseOptions('Torque', 'Nm', '#28a745', false)
+        type: 'line', data: { labels: graphData.labels, datasets: [{ data: graphData.voltage, borderColor: '#28a745', borderWidth: 1.2, pointRadius: 0 }] },
+        options: getBaseOptions(false)
     }),
     pidF: new Chart(document.getElementById('chartPIDFixed'), {
         type: 'line', data: { labels: graphData.labels, datasets: [
             { label: 'P', data: graphData.p, borderColor: '#ff9f40', borderWidth: 1, pointRadius: 0 },
             { label: 'I', data: graphData.i, borderColor: '#4bc0c0', borderWidth: 1, pointRadius: 0 },
             { label: 'D', data: graphData.d, borderColor: '#9966ff', borderWidth: 1, pointRadius: 0 }
-        ] }, options: getBaseOptions('PID', '', '#666', true, -15, 15)
+        ] }, options: getBaseOptions(true, -15, 15)
     }),
     pidD: new Chart(document.getElementById('chartPIDDynamic'), {
         type: 'line', data: { labels: graphData.labels, datasets: [
             { label: 'P', data: graphData.p, borderColor: '#ff9f40', borderWidth: 1, pointRadius: 0 },
             { label: 'I', data: graphData.i, borderColor: '#4bc0c0', borderWidth: 1, pointRadius: 0 },
             { label: 'D', data: graphData.d, borderColor: '#9966ff', borderWidth: 1, pointRadius: 0 }
-        ] }, options: getBaseOptions('PID', '', '#666', false)
+        ] }, options: getBaseOptions(false)
     })
 };
 
-// 동적 스케일 업데이트 함수
 function updateScales() {
     const configs = [
         { id: 'angleD', boundKey: 'angle', dataKeys: ['angle'] },
@@ -136,19 +138,13 @@ function updateScales() {
         });
 
         if (min === Infinity) { min = -1; max = 1; }
-        
         let range = max - min;
-        if (range < 2) { // 최소 범위 2 보장
-            const mid = (max + min) / 2;
-            min = mid - 1; max = mid + 1;
-            range = 2;
-        }
+        if (range < 2) { const mid = (max + min) / 2; min = mid - 1; max = mid + 1; range = 2; }
 
-        const targetMin = min - range * 0.2;
-        const targetMax = max + range * 0.2;
-
+        const targetMin = min - range * 0.15;
+        const targetMax = max + range * 0.15;
         const bounds = dynBounds[cfg.boundKey];
-        // 확장 즉시, 축소 서서히
+
         bounds.min = targetMin < bounds.min ? targetMin : bounds.min + (targetMin - bounds.min) * 0.05;
         bounds.max = targetMax > bounds.max ? targetMax : bounds.max + (targetMax - bounds.max) * 0.05;
 
@@ -226,11 +222,9 @@ function update() {
 function draw(targetRad) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const drawL = 100;
+    const cx = canvas.width / 2, cy = canvas.height / 2, drawL = 140;
 
-    // 눈금판
+    // 배경 눈금
     ctx.save();
     ctx.translate(cx, cy);
     ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
@@ -239,9 +233,10 @@ function draw(targetRad) {
     ctx.textAlign = 'center';
     for (let i = 0; i < 360; i += 30) {
         const rad = (i - 90) * (Math.PI / 180);
-        const x1 = Math.cos(rad) * (drawL + 5), y1 = Math.sin(rad) * (drawL + 5);
-        const x2 = Math.cos(rad) * (drawL + 12), y2 = Math.sin(rad) * (drawL + 12);
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(rad) * (drawL + 5), Math.sin(rad) * (drawL + 5));
+        ctx.lineTo(Math.cos(rad) * (drawL + 12), Math.sin(rad) * (drawL + 12));
+        ctx.stroke();
         const label = i <= 180 ? i : i - 360;
         ctx.fillText(label, Math.cos(rad) * (drawL + 20), Math.sin(rad) * (drawL + 20) + 3);
     }
@@ -269,10 +264,10 @@ function draw(targetRad) {
     ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = isDark ? '#333' : '#bbb'; ctx.stroke();
     ctx.restore();
 
-    // 막대기
+    // 막대기 (Thinner rod)
     const px = cx + Math.sin(angle) * drawL, py = cy + Math.cos(angle) * drawL;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
-    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = isDark ? '#ecf0f1' : '#2c3e50'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
 
     // 샤프트 & 추
     ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = isDark ? '#777' : '#666'; ctx.fill();
@@ -285,7 +280,6 @@ elements.resetBtn.addEventListener('click', () => {
     ['target', 'manualVolt', 'kp', 'ki', 'kd'].forEach(id => document.getElementById(id).value = 0);
     syncSliderTexts();
     angle = 0; angularVelocity = 0; integral = 0; prevError = 0;
-    Object.keys(dynBounds).forEach(k => { dynBounds[k].min = -5; dynBounds[k].max = 5; });
 });
 
 elements.pauseBtn.addEventListener('click', () => {
