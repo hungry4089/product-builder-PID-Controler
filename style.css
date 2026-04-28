@@ -108,6 +108,25 @@ h3 { font-size: 0.85rem; margin: 0 0 5px 0; }
 .btn-reset { background: var(--accent-red); }
 .btn-pause { background: #6c757d; }
 
+.pid-guide {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0,0,0,0.03);
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+}
+
+.guide-item {
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+    line-height: 1.4;
+    color: #555;
+}
+
+.guide-item strong {
+    color: var(--text-color);
+}
+
 /* 그래프 높이 살짝 축소하여 상단 영역 확보 */
 .graph-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .graph-card { height: 135px; display: flex; flex-direction: column; }
